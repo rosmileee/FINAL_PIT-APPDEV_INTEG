@@ -1,0 +1,574 @@
+// screens/BookingScreen.js
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import CalendarPicker from 'react-native-calendar-picker';
+import moment from 'moment';
+
+const BookingScreen = () => {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { roomId, room } = route.params;
+
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [checkInDate, setCheckInDate] = useState(null);
+  const [checkOutDate, setCheckOutDate] = useState(null);
+  const [selectingCheckOut, setSelectingCheckOut] = useState(false);
+
+  const onDateChange = (date) => {
+    if (!checkInDate) {
+      setCheckInDate(date);
+      setSelectingCheckOut(true);
+    } else if (selectingCheckOut) {
+      if (date.isSameOrAfter(checkInDate, 'day')) {
+        setCheckOutDate(date);
+      } else {
+        alert('Check-out date must be after or the same as check-in date.');
+      }
+    }
+  };
+
+  const handleConfirmBooking = () => {
+    if (!fullName || !email || !phone || !checkInDate || !checkOutDate) {
+      alert('Please fill in all the required details and select both check-in and check-out dates.');
+      return;
+    }
+
+    const bookingDetails = {
+      roomId: roomId,
+      fullName: fullName,
+      email: email,
+      phone: phone,
+      checkInDate: checkInDate ? moment(checkInDate).format('YYYY-MM-DD') : null,
+      checkOutDate: checkOutDate ? moment(checkOutDate).format('YYYY-MM-DD') : null,
+      // Add more details here
+    };
+
+    console.log('Booking Details:', bookingDetails);
+    // **NEXT STEP: Send bookingDetails to your backend API**
+    // **NEXT STEP: Handle success and error responses**
+    // **NEXT STEP: Navigate to a confirmation screen**
+  };
+
+  return (
+    <ScrollView style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.backButtonText}>← Back</Text>
+      </TouchableOpacity>
+      <Text style={styles.title}>Book A Room</Text>
+
+      {room && <Text style={styles.roomName}>Booking: {room.name}</Text>}
+
+      <TextInput
+        style={styles.input}
+        placeholder="Full Name"
+        value={fullName}
+        onChangeText={setFullName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        keyboardType="email-address"
+        value={email}
+        onChangeText={setEmail}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Phone Number"
+        keyboardType="phone-pad"
+        value={phone}
+        onChangeText={setPhone}
+      />
+
+      <Text style={styles.label}>
+        Select {selectingCheckOut ? 'Check-Out' : 'Check-In'} Date
+      </Text>
+      <CalendarPicker
+        startDate={checkInDate}
+        endDate={checkOutDate}
+        onDateChange={onDateChange}
+        minDate={!selectingCheckOut ? moment() : checkInDate}
+        selectedDayColor="#007bff"
+        selectedDayTextColor="#FFFFFF"
+        todayBackgroundColor="#e0f7fa"
+        textStyle={{ fontFamily: 'System' }}
+        // Add more styling props
+      />
+
+      {checkInDate && checkOutDate && (
+        <Text style={styles.selectedDates}>
+          Check-In: {moment(checkInDate).format('YYYY-MM-DD')}
+          {'\n'}
+          Check-Out: {moment(checkOutDate).format('YYYY-MM-DD')}
+        </Text>
+      )}
+
+      <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmBooking}>
+        <Text style={styles.confirmButtonText}>Confirm Booking</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#f4f4f4',
+  },
+  backButton: {
+    marginBottom: 16,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007bff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    textAlign: 'center',
+    color: '#333',
+  },
+  roomName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#555',
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+    color: '#555',
+  },
+  input: {
+    width: '100%',
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  confirmButton: {
+    backgroundColor: '#ffa000',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 32,
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  selectedDates: {
+    fontSize: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#555',
+  },
+});
+
+export default BookingScreen;
+
+
+const User = require('../models/user.model');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+const generateToken = (id) => {
+    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+};
+
+exports.registerUser = async (req, res) => {
+    const { name, email, password } = req.body;
+    try {
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'Please fill in all fields' });
+        }
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(409).json({ message: 'User already exists' });
+        }
+        const user = await User.create({ name, email, password });
+        if (user) {
+            res.status(201).json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                isAdmin: user.isAdmin,
+                token: generateToken(user._id),
+            });
+        } else {
+            res.status(400).json({ message: 'Invalid user data' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.loginUser = async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (user && (await user.comparePassword(password))) {
+            res.json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                isAdmin: user.isAdmin,
+                token: generateToken(user._id),
+            });
+        } else {
+            res.status(401).json({ message: 'Invalid email or password' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.getUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password');
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const Booking = require('../models/booking.model');
+
+exports.createBooking = async (req, res) => {
+    const { room, checkInDate, checkOutDate, numberOfGuests } = req.body;
+    try {
+        const booking = await Booking.create({
+            user: req.user._id,
+            room,
+            checkInDate,
+            checkOutDate,
+            numberOfGuests,
+            // Calculate totalPrice based on room price and duration (complex feature)
+            // For simplicity, let's assume totalPrice is passed in the request for now
+            totalPrice: req.body.totalPrice,
+        });
+        res.status(201).json(booking);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+exports.getAllBookings = async (req, res) => {
+    try {
+        const bookings = await Booking.find().populate('user', 'name email').populate('room', 'name price');
+        res.json(bookings);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.getBookingById = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id).populate('user', 'name email').populate('room', 'name price');
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        res.json(booking);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.updateBooking = async (req, res) => {
+    try {
+        const booking = await Booking.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        res.json(booking);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+exports.deleteBooking = async (req, res) => {
+    try {
+        const booking = await Booking.findByIdAndDelete(req.params.id);
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Complex Feature: Check Room Availability
+exports.checkAvailability = async (req, res) => {
+    const { roomId, checkInDate, checkOutDate } = req.query;
+    try {
+        const conflictingBookings = await Booking.find({
+            room: roomId,
+            $or: [
+                { checkInDate: { $lt: new Date(checkOutDate) }, checkOutDate: { $gt: new Date(checkInDate) } },
+            ],
+        });
+        res.json({ isAvailable: conflictingBookings.length === 0, conflictingBookings });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const Room = require('../models/room.model');
+
+exports.createRoom = async (req, res) => {
+    try {
+        const room = await Room.create(req.body);
+        res.status(201).json(room);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+exports.getAllRooms = async (req, res) => {
+    try {
+        const rooms = await Room.find();
+        res.json(rooms);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.getRoomById = async (req, res) => {
+    try {
+        const room = await Room.findById(req.params.id);
+        if (!room) {
+            return res.status(404).json({ message: 'Room not found' });
+        }
+        res.json(room);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.updateRoom = async (req, res) => {
+    try {
+        const room = await Room.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!room) {
+            return res.status(404).json({ message: 'Room not found' });
+        }
+        res.json(room);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+exports.deleteRoom = async (req, res) => {
+    try {
+        const room = await Room.findByIdAndDelete(req.params.id);
+        if (!room) {
+            return res.status(404).json({ message: 'Room not found' });
+        }
+        res.status(204).send(); // No content
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const jwt = require('jsonwebtoken');
+const User = require('../models/user.model');
+
+exports.protect = async (req, res, next) => {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = await User.findById(decoded.id).select('-password');
+            next();
+        } catch (error) {
+            console.error(error);
+            res.status(401).json({ message: 'Not authorized, token failed' });
+        }
+    }
+
+    if (!token)
+ {
+        res.status(401).json({ message: 'Not authorized, no token' });
+    }
+};
+
+exports.admin = (req, res, next) => {
+    if (req.user && req.user.isAdmin) {
+        next();
+    } else {
+        res.status(403).json({ message: 'Not authorized as an admin' });
+    }
+};
+
+
+const mongoose = require('mongoose');
+
+const bookingSchema = new mongoose.Schema({
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
+    checkInDate: { type: Date, required: true },
+    checkOutDate: { type: Date, required: true },
+    numberOfGuests: { type: Number, required: true },
+    totalPrice: { type: Number },
+    bookingStatus: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' },
+    // Add other booking-related fields
+}, { timestamps: true });
+
+module.exports = mongoose.model('Booking', bookingSchema);
+
+const mongoose = require('mongoose');
+
+const roomSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    description: { type: String, required: true },
+    image: { type: String },
+    details: { type: String },
+    price: { type: Number, required: true },
+    amenities: [String],
+    capacity: { type: Number },
+    // Add other room-related fields
+}, { timestamps: true });
+
+module.exports = mongoose.model('Room', roomSchema);
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    isAdmin: { type: Boolean, default: false },
+    // Add other user-related fields
+}, { timestamps: true });
+
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
+
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return bcrypt.compare(candidatePassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
+
+
+
+const express = require('express');
+const router = express.Router();
+const authController = require('../controllers/auth.controller');
+const { protect } = require('../middleware/authMiddleware'); // Import protect if you want to secure profile route
+
+router.post('/register', authController.registerUser);
+router.post('/login', authController.loginUser);
+router.get('/profile', protect, authController.getUserProfile); // Example of a protected route
+
+module.exports = router;
+
+const express = require('express');
+const router = express.Router();
+const bookingController = require('../controllers/booking.controller');
+const { protect } = require('../middleware/authMiddleware');
+
+router.route('/').post(protect, bookingController.createBooking).get(protect, bookingController.getAllBookings);
+router.route('/:id').get(protect, bookingController.getBookingById).put(protect, bookingController.updateBooking).delete(protect, bookingController.deleteBooking);
+router.get('/availability', bookingController.checkAvailability);
+
+module.exports = router;
+
+const express = require('express');
+const router = express.Router();
+const roomController = require('../controllers/room.controller');
+const { protect, admin } = require('../middleware/authMiddleware');
+
+router.route('/').post(protect, admin, roomController.createRoom).get(roomController.getAllRooms);
+router.route('/:id').get(roomController.getRoomById).put(protect, admin, roomController.updateRoom).delete(protect, admin, roomController.deleteRoom);
+
+module.exports = router;
+
+module.exports = (io) => {
+    io.on('connection', (socket) => {
+        console.log('A user connected via WebSocket');
+
+        socket.on('newBooking', (bookingData) => {
+            // In a real application, you would save the booking to the database here
+            console.log('New booking received:', bookingData);
+            // Emit a 'bookingUpdated' event to all connected clients
+            io.emit('bookingUpdated', bookingData);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('A user disconnected from WebSocket');
+        });
+    });
+};
+
+MONGO_URI=mongodb+srv://rosmillago:rosmil060904@cluster0.jymsu.mongodb.net/mern-roomora?retryWrites=true&w=majority
+JWT_SECRET=rosmil060904
+PORT=3000
+
+
+const express = require('express');
+const dotenv = require('dotenv').config();
+const cors = require('cors');
+const connectDB = require('./config/database');
+const authRoutes = require('./routes/auth.routes');
+const roomRoutes = require('./routes/room.routes');
+const bookingRoutes = require('./routes/booking.routes');
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+connectDB();
+
+app.use(cors()); // Basic usage - allows all origins
+
+// Or, for more controlled access (recommended for production):
+// const corsOptions = {
+//   origin: 'http://your-frontend-domain.com', // Replace with your frontend's domain
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true,
+//   optionsSuccessStatus: 204,
+// };
+// app.use(cors(corsOptions));
+
+app.use(express.json()); // Built-in middleware to parse JSON request bodies
+
+app.use('/api/auth', authRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/bookings', bookingRoutes);
+
+const server = app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
+
+// Socket.IO setup (if you plan to use websockets)
+const socketIO = require('socket.io')(server, {
+    cors: {
+        origin: "*", // Or your frontend's origin for production
+        methods: ["GET", "POST"]
+    }
+});
+const bookingSockets = require('./sockets/bookingSockets');
+bookingSockets(socketIO);
+
